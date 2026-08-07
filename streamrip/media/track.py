@@ -84,8 +84,13 @@ class Track(Media):
         delivered_sampling_rate = getattr(self.downloadable, "sampling_rate", None)
         if delivered_bit_depth is not None:
             self.meta.info.bit_depth = delivered_bit_depth
+            # Correct the shared album metadata too, so Album.postprocess can
+            # rename the album folder (built pre-download from a placeholder)
+            # to the delivered quality.
+            self.meta.album.info.bit_depth = delivered_bit_depth
         if delivered_sampling_rate is not None:
             self.meta.info.sampling_rate = delivered_sampling_rate
+            self.meta.album.info.sampling_rate = delivered_sampling_rate
 
         await tag_file(self.download_path, self.meta, self.cover_path)
         if self.config.session.conversion.enabled:
