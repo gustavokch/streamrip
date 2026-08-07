@@ -60,3 +60,12 @@ def test_track_metadata_qobuz():
     assert t.tracknumber == 9
     assert t.discnumber == 1
     assert t.composer == "John Darnielle"
+
+
+def test_album_folder_path_title_keys():
+    m = AlbumMetadata.from_qobuz(qobuz_album_resp)
+    # new explicit keys render the album title
+    assert m.format_folder_path("{albumtitle}") == "Rumours"
+    assert m.format_folder_path("{album_title}") == "Rumours"
+    # backward compat: title still resolves to the album title in folder context
+    assert m.format_folder_path("{title}") == "Rumours"

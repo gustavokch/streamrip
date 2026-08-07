@@ -63,8 +63,9 @@ class AlbumMetadata:
         return _copyright
 
     def format_folder_path(self, formatter: str) -> str:
-        # Available keys: "albumartist", "title", "year", "bit_depth", "sampling_rate",
-        # "id", and "albumcomposer",
+        # Available keys: "albumartist", "albumtitle" (alias "album_title"),
+        # "title" (deprecated), "year", "bit_depth", "sampling_rate",
+        # "id", "container", and "albumcomposer",
 
         none_str = "Unknown"
         info: dict[str, str | int | float] = {
@@ -74,6 +75,8 @@ class AlbumMetadata:
             "id": self.info.id,
             "sampling_rate": self.info.sampling_rate or none_str,
             "title": clean_filename(self.album),
+            "albumtitle": clean_filename(self.album),
+            "album_title": clean_filename(self.album),
             "year": self.year,
             "container": self.info.container,
         }
