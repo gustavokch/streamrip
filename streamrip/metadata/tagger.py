@@ -40,6 +40,8 @@ MP4_KEYS = (
     None,
     None,
     "----:com.apple.iTunes:ISRC",
+    None,  # bit_depth - no MP4 atom; lossy formats have no PCM bit depth
+    None,  # sampling_rate
 )
 
 MP3_KEYS = (
@@ -64,6 +66,8 @@ MP3_KEYS = (
     None,
     None,
     id3.TSRC,
+    None,  # bit_depth - no MP3 frame for PCM bit depth
+    None,  # sampling_rate
 )
 
 METADATA_TYPES = (
@@ -88,6 +92,8 @@ METADATA_TYPES = (
     "disctotal",
     "date",
     "isrc",
+    "bit_depth",
+    "sampling_rate",
 )
 
 
@@ -174,6 +180,12 @@ class Container(Enum):
         return out
 
     def _attr_from_meta(self, meta: TrackMetadata, attr: str) -> str | None:
+        # bit_depth / sampling_rate live on TrackInfo (meta.info), not on the
+        # track or album directly. For Tidal HiRes, Track.postprocess corrects
+        # these to the delivered stream's real values before tagging.
+        if attr in ("bit_depth", "sampling_rate"):
+            val = getattr(meta.info, attr)
+            return str(val) if val is not None else None
         # TODO: verify this works
         in_trackmetadata = {
             "title",

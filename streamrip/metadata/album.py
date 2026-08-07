@@ -322,6 +322,7 @@ class AlbumMetadata:
             "HIGH": 1,
             "LOSSLESS": 2,
             "HI_RES": 3,
+            "HI_RES_LOSSLESS": 4,
         }
 
         tidal_quality = resp.get("audioQuality", "LOW")
@@ -406,6 +407,7 @@ class AlbumMetadata:
             "HIGH": 1,
             "LOSSLESS": 2,
             "HI_RES": 3,
+            "HI_RES_LOSSLESS": 4,
         }
 
         tidal_quality = resp.get("audioQuality", "LOW")

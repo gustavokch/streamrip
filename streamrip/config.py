@@ -50,7 +50,8 @@ class TidalConfig:
     # time. If you haven't used streamrip in more than a week, you may have to log
     # in again using `rip config --tidal`
     token_expiry: str
-    # 0: 256kbps AAC, 1: 320kbps AAC, 2: 16/44.1 "HiFi" FLAC, 3: 24/44.1 "MQA" FLAC
+    # 0: 256kbps AAC, 1: 320kbps AAC, 2: 16/44.1 "HiFi" FLAC, 3: 24/44.1 "MQA" FLAC,
+    # 4: HiRes FLAC (<=48 kHz / 24-bit, falls back to 16/44.1)
     quality: int
     # This will download videos included in Video Albums.
     download_videos: bool

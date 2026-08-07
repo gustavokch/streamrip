@@ -4,7 +4,6 @@ import json
 import logging
 import re
 import time
-from json import JSONDecodeError
 
 import aiohttp
 
@@ -40,7 +39,7 @@ class TidalClient(Client):
     """TidalClient."""
 
     source = "tidal"
-    max_quality = 3
+    max_quality = 4
 
     def __init__(self, config: Config):
         self.logged_in = False
@@ -153,8 +152,83 @@ class TidalClient(Client):
         return []
 
     async def get_downloadable(self, track_id: str, quality: int):
+        if quality == 4:
+            return await self._get_hires_lossless_capped(track_id)
+        return await self._get_downloadable_linear(track_id, quality)
+
+    async def _get_downloadable_linear(self, track_id: str, quality: int):
+        """Fetch a downloadable for the legacy quality tiers (0-3).
+
+        On a hard refusal (no manifest returned) it raises. On an undecodable
+        manifest it retries with quality - 1, walking down to the quality 0
+        floor (which raises instead of recursing, so the index can never go
+        negative and reach ``QUALITY_MAP[-1]``).
+        """
+        manifest, refused = await self._fetch_manifest(track_id, QUALITY_MAP[quality])
+        if manifest is None:
+            if refused:
+                raise NonStreamableError(f"Tidal: refused to stream {track_id}")
+            if quality == 0:
+                raise NonStreamableError(
+                    f"Tidal: no streamable manifest for {track_id}"
+                )
+            logger.warning(
+                f"Failed to get manifest for {track_id}. Retrying with lower quality."
+            )
+            return await self._get_downloadable_linear(track_id, quality - 1)
+        return self._build_downloadable(manifest)
+
+    async def _get_hires_lossless_capped(self, track_id: str):
+        """Deliver HiRes FLAC capped at 48 kHz / 24-bit.
+
+        Requests ``HI_RES_LOSSLESS`` and keeps it only when the manifest reports
+        a FLAC stream at <= 48 kHz and <= 24-bit. Otherwise it falls back to
+        ``LOSSLESS`` (16/44.1 CD FLAC). The fallback target is always LOSSLESS
+        (quality 2), never ``HI_RES`` (MQA, quality 3).
+        """
+        manifest, refused = await self._fetch_manifest(track_id, "HI_RES_LOSSLESS")
+        if manifest is not None and self._within_cap(manifest):
+            return self._build_downloadable(manifest)
+
+        # The user asked for HiRes and will receive CD quality, so warn (tiers
+        # 0-3 already warn on downgrade). A hard refusal usually means the
+        # account lacks the HiRes tier or is region-blocked; otherwise the
+        # manifest was undecodable or exceeded the 48 kHz/24-bit cap.
+        if refused:
+            logger.warning(
+                "Tidal: HI_RES_LOSSLESS refused for %s "
+                "(subscription/region restriction?); falling back to LOSSLESS.",
+                track_id,
+            )
+        else:
+            logger.warning(
+                "Tidal: HI_RES_LOSSLESS for %s is undecodable or exceeds the "
+                "48 kHz/24-bit cap; falling back to LOSSLESS.",
+                track_id,
+            )
+
+        manifest, _ = await self._fetch_manifest(track_id, "LOSSLESS")
+        if manifest is None:
+            raise NonStreamableError(
+                f"Tidal: no streamable FLAC for {track_id} "
+                "(HI_RES_LOSSLESS and LOSSLESS both unavailable)"
+            )
+        return self._build_downloadable(manifest)
+
+    async def _fetch_manifest(
+        self, track_id: str, quality_str: str
+    ) -> tuple[dict | None, bool]:
+        """Fetch and decode the playback manifest for a track at a quality tier.
+
+        Returns ``(manifest, refused)``:
+          * ``(dict, False)``  on success.
+          * ``(None, True)``   when Tidal returned no manifest key (hard refusal).
+          * ``(None, False)``  when the manifest was present but undecodable.
+
+        Never downgrades silently; the caller decides the next move.
+        """
         params = {
-            "audioquality": QUALITY_MAP[quality],
+            "audioquality": quality_str,
             "playbackmode": "STREAM",
             "assetpresentation": "FULL",
         }
@@ -162,16 +236,58 @@ class TidalClient(Client):
             f"tracks/{track_id}/playbackinfopostpaywall", params
         )
         logger.debug(resp)
-        try:
-            manifest = json.loads(base64.b64decode(resp["manifest"]).decode("utf-8"))
-        except KeyError:
-            raise Exception(resp["userMessage"])
-        except JSONDecodeError:
-            logger.warning(
-                f"Failed to get manifest for {track_id}. Retrying with lower quality."
+        raw = resp.get("manifest")
+        if raw is None:
+            logger.debug(
+                "Tidal: no manifest for %s at %s: %s",
+                track_id,
+                quality_str,
+                resp,
             )
-            return await self.get_downloadable(track_id, quality - 1)
+            return None, True
+        try:
+            # ValueError covers JSONDecodeError and binascii.Error (bad base64);
+            # TypeError covers a non-string manifest value (e.g. a nested dict).
+            decoded = json.loads(base64.b64decode(raw).decode("utf-8"))
+        except (ValueError, TypeError) as e:
+            logger.debug(
+                "Tidal: undecodable manifest for %s at %s: %s",
+                track_id,
+                quality_str,
+                e,
+            )
+            return None, False
+        if not isinstance(decoded, dict):
+            logger.debug(
+                "Tidal: manifest for %s at %s decoded to non-dict %r",
+                track_id,
+                quality_str,
+                type(decoded).__name__,
+            )
+            return None, False
+        return decoded, False
 
+    @staticmethod
+    def _within_cap(manifest: dict) -> bool:
+        """True when the manifest is a FLAC stream within the 48 kHz / 24-bit cap."""
+        codec = str(manifest.get("codecs", "")).lower()
+        sample_rate = manifest.get("sampleRate")
+        bit_depth = manifest.get("bitsPerSample")
+        # bool is an int subclass, so exclude it explicitly (a malformed
+        # ``bitsPerSample: true`` must not pass the cap). Accept float too:
+        # JSON numbers may decode as float, and the repo types sampling_rate as
+        # int | float elsewhere; rejecting 48000.0 would silently downgrade.
+        return (
+            codec == "flac"
+            and isinstance(sample_rate, (int, float))
+            and not isinstance(sample_rate, bool)
+            and sample_rate <= 48000
+            and isinstance(bit_depth, (int, float))
+            and not isinstance(bit_depth, bool)
+            and bit_depth <= 24
+        )
+
+    def _build_downloadable(self, manifest: dict) -> TidalDownloadable:
         logger.debug(manifest)
         enc_key = manifest.get("keyId")
         if manifest.get("encryptionType") == "NONE":
@@ -182,6 +298,8 @@ class TidalClient(Client):
             codec=manifest["codecs"],
             encryption_key=enc_key,
             restrictions=manifest.get("restrictions"),
+            sampling_rate=manifest.get("sampleRate"),
+            bit_depth=manifest.get("bitsPerSample"),
         )
 
     async def get_video_file_url(self, video_id: str) -> str:
