@@ -76,6 +76,17 @@ class Track(Media):
         if self.is_single:
             remove_title(self.meta.title)
 
+        # Prefer the delivered stream's real sample rate / bit depth when the
+        # source reports them (e.g. Tidal HiRes FLAC), so metadata matches the
+        # actual file instead of the pre-download placeholder. getattr keeps
+        # this safe for downloadables that do not carry these attributes.
+        delivered_bit_depth = getattr(self.downloadable, "bit_depth", None)
+        delivered_sampling_rate = getattr(self.downloadable, "sampling_rate", None)
+        if delivered_bit_depth is not None:
+            self.meta.info.bit_depth = delivered_bit_depth
+        if delivered_sampling_rate is not None:
+            self.meta.info.sampling_rate = delivered_sampling_rate
+
         await tag_file(self.download_path, self.meta, self.cover_path)
         if self.config.session.conversion.enabled:
             await self._convert()

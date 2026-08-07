@@ -39,7 +39,8 @@ app_id = "12345"
 secrets = ['secret1', 'secret2']
 
 [tidal]
-# 0: 256kbps AAC, 1: 320kbps AAC, 2: 16/44.1 "HiFi" FLAC, 3: 24/44.1 "MQA" FLAC
+# 0: 256kbps AAC, 1: 320kbps AAC, 2: 16/44.1 "HiFi" FLAC, 3: 24/44.1 "MQA" FLAC,
+# 4: HiRes FLAC (<=48 kHz / 24-bit, falls back to 16/44.1)
 quality = 3
 # This will download videos included in Video Albums.
 download_videos = true

@@ -230,9 +230,15 @@ class TidalDownloadable(Downloadable):
         codec: str,
         encryption_key: str | None,
         restrictions,
+        sampling_rate: int | None = None,
+        bit_depth: int | None = None,
     ):
         self.session = session
         self.source = "tidal"
+        # Real values read from the manifest (None for streams that don't report
+        # them). Used to correct track metadata to match the delivered file.
+        self.sampling_rate = sampling_rate
+        self.bit_depth = bit_depth
         codec = codec.lower()
         if codec in ("flac", "mqa"):
             self.extension = "flac"
