@@ -174,11 +174,11 @@ class FilepathsConfig:
     # template
     add_singles_to_folder: bool
     # Available keys: "albumartist", "albumtitle" (alias "album_title"),
-    # "title" (deprecated), "year", "bit_depth", "sampling_rate",
+    # "title" — deprecated, "year", "bit_depth", "sampling_rate",
     # "container", "id", and "albumcomposer"
     folder_format: str
     # Available keys: "tracknumber", "artist", "albumartist", "composer",
-    # "title" (deprecated), "tracktitle" (alias "track_title"),
+    # "title" — deprecated, "tracktitle" (alias "track_title"),
     # "albumtitle" (alias "album_title"), and "albumcomposer"
     track_format: str
     # Only allow printable ASCII characters in filenames.

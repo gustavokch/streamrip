@@ -229,7 +229,7 @@ class TrackMetadata:
 
     def format_track_path(self, format_string: str) -> str:
         # Available keys: "tracknumber", "artist", "albumartist", "composer",
-        # "title" (deprecated), "tracktitle" (alias "track_title"),
+        # "title" — deprecated, "tracktitle" (alias "track_title"),
         # "albumtitle" (alias "album_title"), "explicit", "albumcomposer"
         none_text = "Unknown"
         info = {

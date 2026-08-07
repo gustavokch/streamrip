@@ -64,7 +64,7 @@ class AlbumMetadata:
 
     def format_folder_path(self, formatter: str) -> str:
         # Available keys: "albumartist", "albumtitle" (alias "album_title"),
-        # "title" (deprecated), "year", "bit_depth", "sampling_rate",
+        # "title" — deprecated, "year", "bit_depth", "sampling_rate",
         # "id", "container", and "albumcomposer",
 
         none_str = "Unknown"
