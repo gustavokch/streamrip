@@ -160,9 +160,9 @@ class TidalClient(Client):
         """Fetch a downloadable for the legacy quality tiers (0-3).
 
         On a hard refusal (no manifest returned) it raises. On an undecodable
-        manifest it retries once with quality - 1. The quality 0 floor raises
-        instead of recursing, so the index can never go negative and reach
-        ``QUALITY_MAP[-1]``.
+        manifest it retries with quality - 1, walking down to the quality 0
+        floor (which raises instead of recursing, so the index can never go
+        negative and reach ``QUALITY_MAP[-1]``).
         """
         manifest, refused = await self._fetch_manifest(track_id, QUALITY_MAP[quality])
         if manifest is None:
@@ -186,9 +186,26 @@ class TidalClient(Client):
         ``LOSSLESS`` (16/44.1 CD FLAC). The fallback target is always LOSSLESS
         (quality 2), never ``HI_RES`` (MQA, quality 3).
         """
-        manifest, _ = await self._fetch_manifest(track_id, "HI_RES_LOSSLESS")
+        manifest, refused = await self._fetch_manifest(track_id, "HI_RES_LOSSLESS")
         if manifest is not None and self._within_cap(manifest):
             return self._build_downloadable(manifest)
+
+        # The user asked for HiRes and will receive CD quality, so warn (tiers
+        # 0-3 already warn on downgrade). A hard refusal usually means the
+        # account lacks the HiRes tier or is region-blocked; otherwise the
+        # manifest was undecodable or exceeded the 48 kHz/24-bit cap.
+        if refused:
+            logger.warning(
+                "Tidal: HI_RES_LOSSLESS refused for %s "
+                "(subscription/region restriction?); falling back to LOSSLESS.",
+                track_id,
+            )
+        else:
+            logger.warning(
+                "Tidal: HI_RES_LOSSLESS for %s is undecodable or exceeds the "
+                "48 kHz/24-bit cap; falling back to LOSSLESS.",
+                track_id,
+            )
 
         manifest, _ = await self._fetch_manifest(track_id, "LOSSLESS")
         if manifest is None:
@@ -229,9 +246,10 @@ class TidalClient(Client):
             )
             return None, True
         try:
-            # ValueError covers both JSONDecodeError and binascii.Error (bad base64).
-            return json.loads(base64.b64decode(raw).decode("utf-8")), False
-        except ValueError as e:
+            # ValueError covers JSONDecodeError and binascii.Error (bad base64);
+            # TypeError covers a non-string manifest value (e.g. a nested dict).
+            decoded = json.loads(base64.b64decode(raw).decode("utf-8"))
+        except (ValueError, TypeError) as e:
             logger.debug(
                 "Tidal: undecodable manifest for %s at %s: %s",
                 track_id,
@@ -239,6 +257,15 @@ class TidalClient(Client):
                 e,
             )
             return None, False
+        if not isinstance(decoded, dict):
+            logger.debug(
+                "Tidal: manifest for %s at %s decoded to non-dict %r",
+                track_id,
+                quality_str,
+                type(decoded).__name__,
+            )
+            return None, False
+        return decoded, False
 
     @staticmethod
     def _within_cap(manifest: dict) -> bool:
@@ -246,11 +273,17 @@ class TidalClient(Client):
         codec = str(manifest.get("codecs", "")).lower()
         sample_rate = manifest.get("sampleRate")
         bit_depth = manifest.get("bitsPerSample")
+        # bool is an int subclass, so exclude it explicitly (a malformed
+        # ``bitsPerSample: true`` must not pass the cap). Accept float too:
+        # JSON numbers may decode as float, and the repo types sampling_rate as
+        # int | float elsewhere; rejecting 48000.0 would silently downgrade.
         return (
             codec == "flac"
-            and isinstance(sample_rate, int)
+            and isinstance(sample_rate, (int, float))
+            and not isinstance(sample_rate, bool)
             and sample_rate <= 48000
-            and isinstance(bit_depth, int)
+            and isinstance(bit_depth, (int, float))
+            and not isinstance(bit_depth, bool)
             and bit_depth <= 24
         )
 

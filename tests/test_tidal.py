@@ -133,7 +133,7 @@ def test_quality4_both_unavailable_raises():
     client = _client({"HI_RES_LOSSLESS": {}, "LOSSLESS": {}})
     with pytest.raises(NonStreamableError):
         arun(client.get_downloadable("1", 4))
-    assert set(client.requested) == {"HI_RES_LOSSLESS", "LOSSLESS"}
+    assert client.requested == ["HI_RES_LOSSLESS", "LOSSLESS"]
 
 
 def test_quality4_mqa_codec_rejected():
@@ -195,3 +195,41 @@ def test_album_from_tidal_playlist_track_resp_maps_hires_lossless():
     }
     album = AlbumMetadata.from_tidal_playlist_track_resp(resp)
     assert album.info.quality == 4
+
+
+# ===== regression tests for _within_cap / _fetch_manifest robustness =====
+
+
+def test_quality4_accepts_float_sample_rate():
+    """A JSON-float sampleRate (e.g. 48000.0) is within cap, not silently rejected."""
+    client = _client(
+        {"HI_RES_LOSSLESS": _resp(_manifest(sample_rate=48000.0, bit_depth=24))}
+    )
+    dl = arun(client.get_downloadable("1", 4))
+    assert client.requested == ["HI_RES_LOSSLESS"]  # no LOSSLESS fallback
+    assert dl.sampling_rate == 48000.0
+
+
+def test_quality4_rejects_bool_sample_rate():
+    """A bool (an int subclass) must not slip through the cap check."""
+    client = _client(
+        {
+            "HI_RES_LOSSLESS": _resp(_manifest(sample_rate=True, bit_depth=24)),
+            "LOSSLESS": _resp(_manifest(sample_rate=44100, bit_depth=16)),
+        }
+    )
+    arun(client.get_downloadable("1", 4))
+    assert client.requested == ["HI_RES_LOSSLESS", "LOSSLESS"]
+
+
+def test_quality4_non_dict_manifest_falls_back():
+    """A manifest that decodes to a non-dict (e.g. a JSON list) must fall back."""
+    client = _client(
+        {
+            "HI_RES_LOSSLESS": {"manifest": base64.b64encode(b"[1, 2, 3]").decode()},
+            "LOSSLESS": _resp(_manifest(sample_rate=44100, bit_depth=16)),
+        }
+    )
+    dl = arun(client.get_downloadable("1", 4))
+    assert dl.sampling_rate == 44100
+    assert client.requested == ["HI_RES_LOSSLESS", "LOSSLESS"]
