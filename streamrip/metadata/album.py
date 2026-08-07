@@ -68,15 +68,16 @@ class AlbumMetadata:
         # "id", "container", and "albumcomposer",
 
         none_str = "Unknown"
+        album_clean = clean_filename(self.album)
         info: dict[str, str | int | float] = {
             "albumartist": clean_filename(self.albumartist),
             "albumcomposer": clean_filename(self.albumcomposer or "") or none_str,
             "bit_depth": self.info.bit_depth or none_str,
             "id": self.info.id,
             "sampling_rate": self.info.sampling_rate or none_str,
-            "title": clean_filename(self.album),
-            "albumtitle": clean_filename(self.album),
-            "album_title": clean_filename(self.album),
+            "title": album_clean,
+            "albumtitle": album_clean,
+            "album_title": album_clean,
             "year": self.year,
             "container": self.info.container,
         }

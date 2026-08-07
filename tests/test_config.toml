@@ -177,7 +177,7 @@ restrict_characters = false
 truncate_to = 120
 # Template for the album subfolder used when `metadata.dj_playlist` is true.
 # Available keys: same as folder_format.
-dj_folder_format = "{albumartist}/{title} - {year}"
+dj_folder_format = "{albumartist}/{albumtitle} - {year}"
 
 # Last.fm playlists are downloaded by searching for the titles of the tracks
 [lastfm]

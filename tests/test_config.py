@@ -207,7 +207,7 @@ def test_sample_config_data_fields(sample_config_data):
             track_format="{tracknumber}. {artist} - {title}{explicit}",
             restrict_characters=False,
             truncate_to=120,
-            dj_folder_format="{albumartist}/{title} - {year}",
+            dj_folder_format="{albumartist}/{albumtitle} - {year}",
         ),
         artwork=ArtworkConfig(
             embed=True,

@@ -73,8 +73,13 @@ class PendingPlaylistTrack(Pending):
 
         # Compute the album subfolder before `set_playlist_to_album` mutates the
         # album name, so the folder always reflects the source album.
-        track_folder = self._track_folder(album)
-        os.makedirs(track_folder, exist_ok=True)
+        try:
+            track_folder = self._track_folder(album)
+            os.makedirs(track_folder, exist_ok=True)
+        except (KeyError, OSError) as e:
+            logger.error(f"Error preparing folder for track {self.id}: {e}")
+            self.db.set_failed(self.client.source, "track", self.id)
+            return None
 
         if c.set_playlist_to_album:
             album.album = self.playlist_name
@@ -103,12 +108,15 @@ class PendingPlaylistTrack(Pending):
         """Folder for this track: the playlist folder, optionally nested under an
         album subfolder when `metadata.dj_playlist` is enabled."""
         if self.config.session.metadata.dj_playlist:
-            return os.path.join(
-                self.folder,
+            subfolder = clean_filepath(
                 album.format_folder_path(
                     self.config.session.filepaths.dj_folder_format
                 ),
+                self.config.session.filepaths.restrict_characters,
             )
+            # A leading separator (e.g. an empty albumartist) would make
+            # os.path.join discard the playlist folder and escape the downloads root.
+            return os.path.join(self.folder, subfolder.lstrip(os.sep))
         return self.folder
 
     async def _download_cover(self, covers: Covers, folder: str) -> str | None:

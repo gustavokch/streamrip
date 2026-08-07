@@ -232,13 +232,15 @@ class TrackMetadata:
         # "title" — deprecated, "tracktitle" (alias "track_title"),
         # "albumtitle" (alias "album_title"), "explicit", "albumcomposer"
         none_text = "Unknown"
+        title = self.title
+        album = self.album.album
         info = {
             "id": self.info.id,
-            "title": self.title,
-            "tracktitle": self.title,
-            "track_title": self.title,
-            "albumtitle": self.album.album,
-            "album_title": self.album.album,
+            "title": title,
+            "tracktitle": title,
+            "track_title": title,
+            "albumtitle": album,
+            "album_title": album,
             "tracknumber": self.tracknumber,
             "artist": self.artist,
             "albumartist": self.album.albumartist,

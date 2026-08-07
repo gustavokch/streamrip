@@ -189,7 +189,7 @@ class FilepathsConfig:
     # Template for the album subfolder used when `metadata.dj_playlist` is true.
     # Available keys: same as folder_format (album-title context, so {albumtitle}
     # or the deprecated {title} resolve to the album title).
-    dj_folder_format: str = "{albumartist}/{title} - {year}"
+    dj_folder_format: str = "{albumartist}/{albumtitle} - {year}"
 
 
 @dataclass(slots=True)
