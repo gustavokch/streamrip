@@ -69,3 +69,16 @@ def test_album_folder_path_title_keys():
     assert m.format_folder_path("{album_title}") == "Rumours"
     # backward compat: title still resolves to the album title in folder context
     assert m.format_folder_path("{title}") == "Rumours"
+
+
+def test_track_path_title_keys():
+    a = AlbumMetadata.from_qobuz(qobuz_track_resp["album"])
+    t = TrackMetadata.from_qobuz(a, qobuz_track_resp)
+    # new explicit track-title keys
+    assert t.format_track_path("{tracktitle}") == "Water Tower"
+    assert t.format_track_path("{track_title}") == "Water Tower"
+    # track context also exposes the album title
+    assert t.format_track_path("{albumtitle}") == "Jenny from Thebes"
+    assert t.format_track_path("{album_title}") == "Jenny from Thebes"
+    # backward compat: title still resolves to the track title in track context
+    assert t.format_track_path("{title}") == "Water Tower"
