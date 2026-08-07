@@ -70,13 +70,19 @@ class PendingPlaylistTrack(Pending):
         c = self.config.session.metadata
         if c.renumber_playlist_tracks:
             meta.tracknumber = self.position
+
+        # Compute the album subfolder before `set_playlist_to_album` mutates the
+        # album name, so the folder always reflects the source album.
+        track_folder = self._track_folder(album)
+        os.makedirs(track_folder, exist_ok=True)
+
         if c.set_playlist_to_album:
             album.album = self.playlist_name
 
         quality = self.config.session.get_source(self.client.source).quality
         try:
             embedded_cover_path, downloadable = await asyncio.gather(
-                self._download_cover(album.covers, self.folder),
+                self._download_cover(album.covers, track_folder),
                 self.client.get_downloadable(self.id, quality),
             )
         except NonStreamableError as e:
@@ -88,10 +94,22 @@ class PendingPlaylistTrack(Pending):
             meta,
             downloadable,
             self.config,
-            self.folder,
+            track_folder,
             embedded_cover_path,
             self.db,
         )
+
+    def _track_folder(self, album: AlbumMetadata) -> str:
+        """Folder for this track: the playlist folder, optionally nested under an
+        album subfolder when `metadata.dj_playlist` is enabled."""
+        if self.config.session.metadata.dj_playlist:
+            return os.path.join(
+                self.folder,
+                album.format_folder_path(
+                    self.config.session.filepaths.dj_folder_format
+                ),
+            )
+        return self.folder
 
     async def _download_cover(self, covers: Covers, folder: str) -> str | None:
         embed_path, _ = await download_artwork(

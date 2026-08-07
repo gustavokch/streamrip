@@ -163,6 +163,9 @@ class MetadataConfig:
     # The following metadata tags won't be applied
     # See https://github.com/nathom/streamrip/wiki/Metadata-Tag-Names for more info
     exclude: list[str]
+    # If true, nest playlist tracks under an album subfolder (see dj_folder_format)
+    # instead of placing them flat in the playlist folder.
+    dj_playlist: bool = False
 
 
 @dataclass(slots=True)
@@ -181,6 +184,9 @@ class FilepathsConfig:
     # Truncate the filename if it is greater than 120 characters
     # Setting this to false may cause downloads to fail on some systems
     truncate_to: int
+    # Template for the album subfolder used when `metadata.dj_playlist` is true.
+    # Available keys: same as folder_format.
+    dj_folder_format: str = "{albumartist}/{title} - {year}"
 
 
 @dataclass(slots=True)

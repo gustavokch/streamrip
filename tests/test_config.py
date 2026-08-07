@@ -207,6 +207,7 @@ def test_sample_config_data_fields(sample_config_data):
             track_format="{tracknumber}. {artist} - {title}{explicit}",
             restrict_characters=False,
             truncate_to=120,
+            dj_folder_format="{albumartist}/{title} - {year}",
         ),
         artwork=ArtworkConfig(
             embed=True,
@@ -219,6 +220,7 @@ def test_sample_config_data_fields(sample_config_data):
             set_playlist_to_album=True,
             renumber_playlist_tracks=True,
             exclude=[],
+            dj_playlist=False,
         ),
         qobuz_filters=QobuzDiscographyFilterConfig(
             extras=False,
