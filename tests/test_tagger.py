@@ -83,6 +83,8 @@ def test_tag_flac_no_cover(sample_metadata):
     assert file["copyright"][0] == "© stuff ℗ other stuff"
     assert file["tracktotal"][0] == "14"
     assert file["date"][0] == "1998-02-13"
+    assert file["bit_depth"][0] == "24"
+    assert file["sampling_rate"][0] == "96"
     assert "purchase_date" not in file, file["purchase_date"]
     os.remove(TEST_FLAC_COPY)
 
