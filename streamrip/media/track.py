@@ -261,12 +261,13 @@ class PendingSingle(Pending):
 
     def _format_folder(self, meta: AlbumMetadata) -> str:
         c = self.config.session
-        parent = c.downloads.folder
-        formatter = c.filepaths.folder_format
-        if c.downloads.source_subdirectories:
-            parent = os.path.join(parent, self.client.source.capitalize())
-
-        return os.path.join(parent, meta.format_folder_path(formatter))
+        return meta.build_folder_path(
+            c.downloads.folder,
+            c.filepaths.folder_format,
+            source_subdirectories=c.downloads.source_subdirectories,
+            source=self.client.source,
+            restrict=c.filepaths.restrict_characters,
+        )
 
     async def _download_cover(self, covers: Covers, folder: str) -> str | None:
         embed_path, _ = await download_artwork(

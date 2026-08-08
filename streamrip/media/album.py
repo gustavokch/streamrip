@@ -8,7 +8,6 @@ from ..client import Client
 from ..config import Config
 from ..db import Database
 from ..exceptions import NonStreamableError
-from ..filepath_utils import clean_filepath
 from ..metadata import AlbumMetadata
 from ..metadata.util import get_album_track_ids
 from .artwork import download_artwork
@@ -108,11 +107,10 @@ class PendingAlbum(Pending):
 
     def _album_folder(self, parent: str, meta: AlbumMetadata) -> str:
         config = self.config.session
-        if config.downloads.source_subdirectories:
-            parent = os.path.join(parent, self.client.source.capitalize())
-        formatter = config.filepaths.folder_format
-        folder = clean_filepath(
-            meta.format_folder_path(formatter), config.filepaths.restrict_characters
+        return meta.build_folder_path(
+            parent,
+            config.filepaths.folder_format,
+            source_subdirectories=config.downloads.source_subdirectories,
+            source=self.client.source,
+            restrict=config.filepaths.restrict_characters,
         )
-
-        return os.path.join(parent, folder)

@@ -1,4 +1,5 @@
 import json
+import os
 
 from streamrip.metadata import AlbumMetadata, TrackMetadata
 
@@ -60,3 +61,45 @@ def test_track_metadata_qobuz():
     assert t.tracknumber == 9
     assert t.discnumber == 1
     assert t.composer == "John Darnielle"
+
+
+def test_album_folder_path_title_keys():
+    m = AlbumMetadata.from_qobuz(qobuz_album_resp)
+    # new explicit keys render the album title
+    assert m.format_folder_path("{albumtitle}") == "Rumours"
+    assert m.format_folder_path("{album_title}") == "Rumours"
+    # backward compat: title still resolves to the album title in folder context
+    assert m.format_folder_path("{title}") == "Rumours"
+
+
+def test_track_path_title_keys():
+    a = AlbumMetadata.from_qobuz(qobuz_track_resp["album"])
+    t = TrackMetadata.from_qobuz(a, qobuz_track_resp)
+    # new explicit track-title keys
+    assert t.format_track_path("{tracktitle}") == "Water Tower"
+    assert t.format_track_path("{track_title}") == "Water Tower"
+    # track context also exposes the album title
+    assert t.format_track_path("{albumtitle}") == "Jenny from Thebes"
+    assert t.format_track_path("{album_title}") == "Jenny from Thebes"
+    # backward compat: title still resolves to the track title in track context
+    assert t.format_track_path("{title}") == "Water Tower"
+
+
+def test_build_folder_path():
+    m = AlbumMetadata.from_qobuz(qobuz_album_resp)  # "Rumours", 1977
+    # parent + rendered album folder
+    assert m.build_folder_path("PARENT", "{albumtitle}") == os.path.join(
+        "PARENT", "Rumours"
+    )
+    # source_subdirectories prepends a capitalized source folder
+    assert m.build_folder_path(
+        "PARENT", "{albumtitle}", source_subdirectories=True, source="qobuz"
+    ) == os.path.join("PARENT", "Qobuz", "Rumours")
+    # restrict_characters is applied (ASCII content is unchanged)
+    assert m.build_folder_path("PARENT", "{albumtitle}", restrict=True) == os.path.join(
+        "PARENT", "Rumours"
+    )
+    # a leading separator in the rendered path cannot escape the parent
+    assert m.build_folder_path("PARENT", "/{albumtitle}") == os.path.join(
+        "PARENT", "Rumours"
+    )

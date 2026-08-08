@@ -17,7 +17,7 @@ logger = logging.getLogger("streamrip")
 APP_DIR = click.get_app_dir("streamrip")
 os.makedirs(APP_DIR, exist_ok=True)
 DEFAULT_CONFIG_PATH = os.path.join(APP_DIR, "config.toml")
-CURRENT_CONFIG_VERSION = "2.2.0"
+CURRENT_CONFIG_VERSION = "2.3.0"
 
 
 class OutdatedConfigError(Exception):
@@ -164,6 +164,11 @@ class MetadataConfig:
     # The following metadata tags won't be applied
     # See https://github.com/nathom/streamrip/wiki/Metadata-Tag-Names for more info
     exclude: list[str]
+    # If true, nest playlist tracks under an album subfolder (see dj_folder_format)
+    # instead of placing them flat in the playlist folder. When enabled, each
+    # subfolder mirrors its source album, so set_playlist_to_album and
+    # renumber_playlist_tracks are ignored to keep the folder and tags consistent.
+    dj_playlist: bool = False
 
 
 @dataclass(slots=True)
@@ -171,17 +176,23 @@ class FilepathsConfig:
     # Create folders for single tracks within the downloads directory using the folder_format
     # template
     add_singles_to_folder: bool
-    # Available keys: "albumartist", "title", "year", "bit_depth", "sampling_rate",
+    # Available keys: "albumartist", "albumtitle" (alias "album_title"),
+    # "title" — deprecated, "year", "bit_depth", "sampling_rate",
     # "container", "id", and "albumcomposer"
     folder_format: str
-    # Available keys: "tracknumber", "artist", "albumartist", "composer", "title",
-    # and "albumcomposer"
+    # Available keys: "tracknumber", "artist", "albumartist", "composer",
+    # "title" — deprecated, "tracktitle" (alias "track_title"),
+    # "albumtitle" (alias "album_title"), and "albumcomposer"
     track_format: str
     # Only allow printable ASCII characters in filenames.
     restrict_characters: bool
     # Truncate the filename if it is greater than 120 characters
     # Setting this to false may cause downloads to fail on some systems
     truncate_to: int
+    # Template for the album subfolder used when `metadata.dj_playlist` is true.
+    # Available keys: same as folder_format (album-title context, so {albumtitle}
+    # or the deprecated {title} resolve to the album title).
+    dj_folder_format: str = "{albumartist}/{albumtitle} - {year}"
 
 
 @dataclass(slots=True)

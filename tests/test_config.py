@@ -136,7 +136,7 @@ def test_config_file_update():
     assert toml["cli"]["text_output"] is True  # type: ignore
     assert toml["cli"]["progress_bars"] is True  # type: ignore
     assert toml["cli"]["max_search_results"] == 100  # type: ignore
-    assert toml["misc"]["version"] == "2.2.0"  # type: ignore
+    assert toml["misc"]["version"] == "2.3.0"  # type: ignore
     assert "YouTubeVideos" in str(toml["youtube"]["video_downloads_folder"])
     # type: ignore
     os.remove("tests/test_config_old2.toml")
@@ -207,6 +207,7 @@ def test_sample_config_data_fields(sample_config_data):
             track_format="{tracknumber}. {artist} - {title}{explicit}",
             restrict_characters=False,
             truncate_to=120,
+            dj_folder_format="{albumartist}/{albumtitle} - {year}",
         ),
         artwork=ArtworkConfig(
             embed=True,
@@ -219,6 +220,7 @@ def test_sample_config_data_fields(sample_config_data):
             set_playlist_to_album=True,
             renumber_playlist_tracks=True,
             exclude=[],
+            dj_playlist=False,
         ),
         qobuz_filters=QobuzDiscographyFilterConfig(
             extras=False,

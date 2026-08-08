@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Optional
@@ -63,22 +64,48 @@ class AlbumMetadata:
         return _copyright
 
     def format_folder_path(self, formatter: str) -> str:
-        # Available keys: "albumartist", "title", "year", "bit_depth", "sampling_rate",
-        # "id", and "albumcomposer",
+        # Available keys: "albumartist", "albumtitle" (alias "album_title"),
+        # "title" — deprecated, "year", "bit_depth", "sampling_rate",
+        # "id", "container", and "albumcomposer",
 
         none_str = "Unknown"
+        album_clean = clean_filename(self.album)
         info: dict[str, str | int | float] = {
             "albumartist": clean_filename(self.albumartist),
             "albumcomposer": clean_filename(self.albumcomposer or "") or none_str,
             "bit_depth": self.info.bit_depth or none_str,
             "id": self.info.id,
             "sampling_rate": self.info.sampling_rate or none_str,
-            "title": clean_filename(self.album),
+            "title": album_clean,
+            "albumtitle": album_clean,
+            "album_title": album_clean,
             "year": self.year,
             "container": self.info.container,
         }
 
         return clean_filepath(formatter.format(**info))
+
+    def build_folder_path(
+        self,
+        parent: str,
+        formatter: str,
+        *,
+        source_subdirectories: bool = False,
+        source: str | None = None,
+        restrict: bool = False,
+    ) -> str:
+        """Build this album's folder under ``parent``.
+
+        Prepends a per-source subdirectory when ``source_subdirectories`` is
+        set, renders ``formatter`` via :meth:`format_folder_path`, then
+        sanitizes the result with ``restrict``. A leading path separator is
+        stripped so a malformed format cannot discard ``parent`` via
+        :func:`os.path.join`.
+        """
+        if source_subdirectories and source is not None:
+            parent = os.path.join(parent, source.capitalize())
+        folder = clean_filepath(self.format_folder_path(formatter), restrict)
+        return os.path.join(parent, folder.lstrip("/\\"))
 
     @classmethod
     def from_qobuz(cls, resp: dict) -> AlbumMetadata:
