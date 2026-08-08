@@ -76,7 +76,7 @@ class PendingPlaylistTrack(Pending):
         try:
             track_folder = self._track_folder(album)
             os.makedirs(track_folder, exist_ok=True)
-        except (KeyError, OSError) as e:
+        except (KeyError, ValueError, IndexError, OSError) as e:
             logger.error(f"Error preparing folder for track {self.id}: {e}")
             self.db.set_failed(self.client.source, "track", self.id)
             return None
@@ -114,9 +114,12 @@ class PendingPlaylistTrack(Pending):
                 ),
                 self.config.session.filepaths.restrict_characters,
             )
-            # A leading separator (e.g. an empty albumartist) would make
-            # os.path.join discard the playlist folder and escape the downloads root.
-            return os.path.join(self.folder, subfolder.lstrip(os.sep))
+            # A leading separator (e.g. an empty albumartist, or a format that
+            # starts with "/") would make os.path.join discard the playlist
+            # folder and escape the downloads root. clean_filepath runs
+            # pathvalidate on the UNIVERSAL platform, which keeps a leading "/",
+            # so strip both separators (on Windows os.sep is "\").
+            return os.path.join(self.folder, subfolder.lstrip("/\\"))
         return self.folder
 
     async def _download_cover(self, covers: Covers, folder: str) -> str | None:
