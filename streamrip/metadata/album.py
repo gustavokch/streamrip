@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Optional
@@ -83,6 +84,28 @@ class AlbumMetadata:
         }
 
         return clean_filepath(formatter.format(**info))
+
+    def build_folder_path(
+        self,
+        parent: str,
+        formatter: str,
+        *,
+        source_subdirectories: bool = False,
+        source: str | None = None,
+        restrict: bool = False,
+    ) -> str:
+        """Build this album's folder under ``parent``.
+
+        Prepends a per-source subdirectory when ``source_subdirectories`` is
+        set, renders ``formatter`` via :meth:`format_folder_path`, then
+        sanitizes the result with ``restrict``. A leading path separator is
+        stripped so a malformed format cannot discard ``parent`` via
+        :func:`os.path.join`.
+        """
+        if source_subdirectories and source is not None:
+            parent = os.path.join(parent, source.capitalize())
+        folder = clean_filepath(self.format_folder_path(formatter), restrict)
+        return os.path.join(parent, folder.lstrip("/\\"))
 
     @classmethod
     def from_qobuz(cls, resp: dict) -> AlbumMetadata:

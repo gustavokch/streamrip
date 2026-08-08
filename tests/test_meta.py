@@ -1,4 +1,5 @@
 import json
+import os
 
 from streamrip.metadata import AlbumMetadata, TrackMetadata
 
@@ -82,3 +83,23 @@ def test_track_path_title_keys():
     assert t.format_track_path("{album_title}") == "Jenny from Thebes"
     # backward compat: title still resolves to the track title in track context
     assert t.format_track_path("{title}") == "Water Tower"
+
+
+def test_build_folder_path():
+    m = AlbumMetadata.from_qobuz(qobuz_album_resp)  # "Rumours", 1977
+    # parent + rendered album folder
+    assert m.build_folder_path("PARENT", "{albumtitle}") == os.path.join(
+        "PARENT", "Rumours"
+    )
+    # source_subdirectories prepends a capitalized source folder
+    assert m.build_folder_path(
+        "PARENT", "{albumtitle}", source_subdirectories=True, source="qobuz"
+    ) == os.path.join("PARENT", "Qobuz", "Rumours")
+    # restrict_characters is applied (ASCII content is unchanged)
+    assert m.build_folder_path("PARENT", "{albumtitle}", restrict=True) == os.path.join(
+        "PARENT", "Rumours"
+    )
+    # a leading separator in the rendered path cannot escape the parent
+    assert m.build_folder_path("PARENT", "/{albumtitle}") == os.path.join(
+        "PARENT", "Rumours"
+    )

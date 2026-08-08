@@ -32,6 +32,33 @@ from .track import Track
 logger = logging.getLogger("streamrip")
 
 
+def _warn_dj_playlist_overrides(config: Config) -> None:
+    """Warn once per playlist when dj_playlist ignores other metadata flags.
+
+    dj_playlist makes each subfolder mirror its source album, so
+    set_playlist_to_album and renumber_playlist_tracks are ignored while it is
+    on. The per-track resolve() would repeat the warning, so this is called
+    from the per-playlist resolve() instead.
+    """
+    c = config.session.metadata
+    if not c.dj_playlist:
+        return
+    ignored = [
+        name
+        for name, enabled in (
+            ("set_playlist_to_album", c.set_playlist_to_album),
+            ("renumber_playlist_tracks", c.renumber_playlist_tracks),
+        )
+        if enabled
+    ]
+    if ignored:
+        logger.warning(
+            "dj_playlist is enabled; ignoring %s so album subfolders keep "
+            "their source-album metadata and track numbers.",
+            ", ".join(ignored),
+        )
+
+
 @dataclass(slots=True)
 class PendingPlaylistTrack(Pending):
     id: str
@@ -68,20 +95,24 @@ class PendingPlaylistTrack(Pending):
             return None
 
         c = self.config.session.metadata
-        if c.renumber_playlist_tracks:
+        if c.renumber_playlist_tracks and not c.dj_playlist:
             meta.tracknumber = self.position
 
-        # Compute the album subfolder before `set_playlist_to_album` mutates the
-        # album name, so the folder always reflects the source album.
+        # Build the track folder. With dj_playlist on it nests under the source
+        # album (multi-disc albums get a `Disc N` subfolder); set_playlist_to_album
+        # is skipped below so the folder and tags agree on the source album.
         try:
             track_folder = self._track_folder(album)
+            downloads = self.config.session.downloads
+            if c.dj_playlist and downloads.disc_subdirectories and album.disctotal > 1:
+                track_folder = os.path.join(track_folder, f"Disc {meta.discnumber}")
             os.makedirs(track_folder, exist_ok=True)
         except (KeyError, ValueError, IndexError, OSError) as e:
             logger.error(f"Error preparing folder for track {self.id}: {e}")
             self.db.set_failed(self.client.source, "track", self.id)
             return None
 
-        if c.set_playlist_to_album:
+        if c.set_playlist_to_album and not c.dj_playlist:
             album.album = self.playlist_name
 
         quality = self.config.session.get_source(self.client.source).quality
@@ -105,30 +136,32 @@ class PendingPlaylistTrack(Pending):
         )
 
     def _track_folder(self, album: AlbumMetadata) -> str:
-        """Folder for this track: the playlist folder, optionally nested under an
-        album subfolder when `metadata.dj_playlist` is enabled."""
-        if self.config.session.metadata.dj_playlist:
-            subfolder = clean_filepath(
-                album.format_folder_path(
-                    self.config.session.filepaths.dj_folder_format
-                ),
-                self.config.session.filepaths.restrict_characters,
-            )
-            # A leading separator (e.g. an empty albumartist, or a format that
-            # starts with "/") would make os.path.join discard the playlist
-            # folder and escape the downloads root. clean_filepath runs
-            # pathvalidate on the UNIVERSAL platform, which keeps a leading "/",
-            # so strip both separators (on Windows os.sep is "\").
-            return os.path.join(self.folder, subfolder.lstrip("/\\"))
-        return self.folder
+        """Folder for this track: the playlist folder, optionally nested under
+        an album subfolder when `metadata.dj_playlist` is enabled."""
+        c = self.config.session
+        if not c.metadata.dj_playlist:
+            return self.folder
+        # Only touch `self.client` when source subdirectories are wanted, so
+        # this method stays usable without a client (see tests).
+        source = self.client.source if c.downloads.source_subdirectories else None
+        return album.build_folder_path(
+            self.folder,
+            c.filepaths.dj_folder_format,
+            source_subdirectories=c.downloads.source_subdirectories,
+            source=source,
+            restrict=c.filepaths.restrict_characters,
+        )
 
     async def _download_cover(self, covers: Covers, folder: str) -> str | None:
+        # dj_playlist nests tracks into album-like subfolders; honor save_artwork
+        # there (as a real album rip does) instead of forcing it off.
+        for_playlist = not self.config.session.metadata.dj_playlist
         embed_path, _ = await download_artwork(
             self.client.session,
             folder,
             covers,
             self.config.session.artwork,
-            for_playlist=True,
+            for_playlist=for_playlist,
         )
         return embed_path
 
@@ -213,6 +246,7 @@ class PendingPlaylist(Pending):
             )
             for position, id in enumerate(meta.ids())
         ]
+        _warn_dj_playlist_overrides(self.config)
         return Playlist(name, self.config, self.client, tracks)
 
 
@@ -298,6 +332,7 @@ class PendingLastfmPlaylist(Pending):
                 ),
             )
 
+        _warn_dj_playlist_overrides(self.config)
         return Playlist(playlist_title, self.config, self.client, pending_tracks)
 
     async def _make_query(

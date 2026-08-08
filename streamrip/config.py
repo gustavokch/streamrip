@@ -17,7 +17,7 @@ logger = logging.getLogger("streamrip")
 APP_DIR = click.get_app_dir("streamrip")
 os.makedirs(APP_DIR, exist_ok=True)
 DEFAULT_CONFIG_PATH = os.path.join(APP_DIR, "config.toml")
-CURRENT_CONFIG_VERSION = "2.2.0"
+CURRENT_CONFIG_VERSION = "2.3.0"
 
 
 class OutdatedConfigError(Exception):
@@ -164,7 +164,9 @@ class MetadataConfig:
     # See https://github.com/nathom/streamrip/wiki/Metadata-Tag-Names for more info
     exclude: list[str]
     # If true, nest playlist tracks under an album subfolder (see dj_folder_format)
-    # instead of placing them flat in the playlist folder.
+    # instead of placing them flat in the playlist folder. When enabled, each
+    # subfolder mirrors its source album, so set_playlist_to_album and
+    # renumber_playlist_tracks are ignored to keep the folder and tags consistent.
     dj_playlist: bool = False
 
 
